@@ -4,13 +4,19 @@
 	import { fade } from "svelte/transition";
 	import { formatTime } from "./Countdown.svelte";
 
+	/** The top score from Countdown.svelte*/
 	export let score: number;
 
+	/** Whether the modal is shown */
 	let showModal = false;
+	/** Whether the submit form is shown */
 	let showSubmit = false;
+	/** Bound to the submit input box */
 	let name: string;
+	/** Array containing all of the highscores */
 	let scores: Highscore[];
 
+	// Auto-sort scores from lowest to highest whenever one changes
 	$: if (scores) scores.sort((a: Highscore, b: Highscore) => a.time - b.time);
 
 	interface Highscore {
@@ -18,16 +24,15 @@
 		time: number;
 	}
 
+	/** Retreive scores when component is mounted */
 	onMount(async () => {
 		scores = await getScores();
-		console.log(scores);
 	});
 
 	const getScores = async () => {
 		let url = new URL(
 			"https://api.jsonbin.io/b/60255820435c323ba1c4ddff/latest"
 		);
-		// url.search = new URLSearchParams({}).toString();
 
 		const rawResponse = await fetch(url as any, {
 			headers: {
@@ -40,13 +45,11 @@
 
 		const content = await rawResponse.json();
 
-		return content;
+		return content as Highscore[];
 	};
 
 	const submitScore = async () => {
 		const url = "https://api.jsonbin.io/b/60255820435c323ba1c4ddff";
-
-		const data = createScores();
 
 		const rawResponse = await fetch(url, {
 			method: "PUT",
@@ -56,7 +59,7 @@
 				"secret-key":
 					"$2b$10$U09tYJeqr/PUBSpn/jp2ZeFdtvVvWf/ZiE0kiAjjl/HEn2Ze.nTqC",
 			},
-			body: data,
+			body: createScores(),
 		});
 
 		const content = await rawResponse.json();
@@ -64,19 +67,26 @@
 		console.log(content);
 	};
 
+	/** Update existing highscores array */
 	const createScores = () => {
-		let changed = false;
+		// Assume array has a new element
+		let changed = true;
 
+		// Check if submitted name matches an existing name in the array
 		scores.forEach((e) => {
+			// If name is found, update user's score and set changed to false
 			if (e.user === name) {
 				e.time = score;
-				changed = true;
+				changed = false;
 			}
 		});
 
+		// If a new user was added, append the array
 		if (changed) scores = [...scores, { user: name, time: score }];
+		// Else, force svelte to rerender the array
 		else scores = scores;
 
+		// Return a stringified array to be submitted
 		return JSON.stringify(scores);
 	};
 </script>
@@ -120,6 +130,9 @@
 							class="rounded py-2 px-4 border border-purple-500 flex-grow focus:outline-none focus:ring focus:border-purple-300"
 							placeholder="Name"
 							bind:value={name}
+							on:keydown={(e) => {
+								if (e.code === "Enter") submitScore();
+							}}
 						/>
 						<button
 							on:click={submitScore}
